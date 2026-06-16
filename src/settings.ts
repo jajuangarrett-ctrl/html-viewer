@@ -3,10 +3,12 @@ import type HtmlViewerPlugin from "../main";
 
 export interface HtmlViewerSettings {
   openInNewTab: boolean;
+  excludedPathPatterns: string;
 }
 
 export const DEFAULT_SETTINGS: HtmlViewerSettings = {
   openInNewTab: true,
+  excludedPathPatterns: "",
 };
 
 export class HtmlViewerSettingTab extends PluginSettingTab {
@@ -32,5 +34,20 @@ export class HtmlViewerSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
+
+    new Setting(containerEl)
+      .setName("Excluded paths")
+      .setDesc("Hide matching HTML files from the chooser. Add one path fragment or * wildcard pattern per line.")
+      .addTextArea((text) => {
+        text.inputEl.rows = 8;
+        text.inputEl.cols = 48;
+        text
+          .setPlaceholder("AI Team/owner_inbox/\n**/Archive/**\nArtifacts/system/")
+          .setValue(this.plugin.settings.excludedPathPatterns)
+          .onChange(async (value) => {
+            this.plugin.settings.excludedPathPatterns = value;
+            await this.plugin.saveSettings();
+          });
+      });
   }
 }

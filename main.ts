@@ -1,6 +1,7 @@
 import { Plugin, SuggestModal, TFile } from "obsidian";
 import { HtmlViewerSettingTab, DEFAULT_SETTINGS, HtmlViewerSettings } from "./src/settings";
 import { HtmlViewerView, VIEW_TYPE_HTML } from "./src/HtmlViewerView";
+import { isPathExcluded, parseExcludePatterns } from "./src/fileFilters";
 
 class HtmlFileSuggestModal extends SuggestModal<TFile> {
   plugin: HtmlViewerPlugin;
@@ -85,9 +86,12 @@ export default class HtmlViewerPlugin extends Plugin {
   }
 
   getHtmlFiles(): TFile[] {
+    const excludePatterns = parseExcludePatterns(this.settings.excludedPathPatterns);
+
     return this.app.vault
       .getFiles()
       .filter((file) => file.extension.toLowerCase() === "html")
+      .filter((file) => !isPathExcluded(file.path, excludePatterns))
       .sort((a, b) => a.path.localeCompare(b.path));
   }
 

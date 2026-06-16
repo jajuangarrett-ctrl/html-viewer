@@ -1,6 +1,6 @@
 {
   "name": "html-viewer",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Open local HTML files inside Obsidian in a dedicated tab.",
   "main": "main.js",
   "scripts": {
