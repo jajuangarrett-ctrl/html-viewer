@@ -41,6 +41,15 @@ describe("pathMatchesExcludePattern", () => {
       )
     ).toBe(true);
   });
+
+  it("tolerates missing whitespace in path fragments", () => {
+    expect(
+      pathMatchesExcludePattern(
+        "Artifacts/Jenny Workout Folder/BeInShapeAnywhere/node_modules/tslib/tslib.es6.html",
+        "Jenny WorkoutFolder"
+      )
+    ).toBe(true);
+  });
 });
 
 describe("isPathExcluded", () => {

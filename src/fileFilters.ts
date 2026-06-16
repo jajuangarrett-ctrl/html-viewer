@@ -2,12 +2,16 @@ function normalizePath(path: string): string {
   return path.replace(/\\/g, "/").toLowerCase();
 }
 
+function normalizeCompactPath(path: string): string {
+  return normalizePath(path).replace(/\s+/g, "");
+}
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function wildcardToRegExp(pattern: string): RegExp {
-  const normalized = normalizePath(pattern.trim());
+function wildcardToRegExp(pattern: string, compact = false): RegExp {
+  const normalized = compact ? normalizeCompactPath(pattern.trim()) : normalizePath(pattern.trim());
   const wildcardPattern = normalized
     .split("*")
     .map(escapeRegExp)
@@ -25,17 +29,22 @@ export function parseExcludePatterns(value: string): string[] {
 
 export function pathMatchesExcludePattern(path: string, pattern: string): boolean {
   const normalizedPath = normalizePath(path);
+  const compactPath = normalizeCompactPath(path);
   const normalizedPattern = normalizePath(pattern.trim());
+  const compactPattern = normalizeCompactPath(pattern.trim());
 
   if (!normalizedPattern) {
     return false;
   }
 
   if (normalizedPattern.includes("*")) {
-    return wildcardToRegExp(normalizedPattern).test(normalizedPath);
+    return (
+      wildcardToRegExp(normalizedPattern).test(normalizedPath) ||
+      wildcardToRegExp(normalizedPattern, true).test(compactPath)
+    );
   }
 
-  return normalizedPath.includes(normalizedPattern);
+  return normalizedPath.includes(normalizedPattern) || compactPath.includes(compactPattern);
 }
 
 export function isPathExcluded(path: string, patterns: string[]): boolean {

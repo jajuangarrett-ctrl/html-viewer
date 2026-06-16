@@ -3,6 +3,12 @@ import { HtmlViewerSettingTab, DEFAULT_SETTINGS, HtmlViewerSettings } from "./sr
 import { HtmlViewerView, VIEW_TYPE_HTML } from "./src/HtmlViewerView";
 import { isPathExcluded, parseExcludePatterns } from "./src/fileFilters";
 
+const BUILT_IN_EXCLUDED_PATH_PATTERNS = [
+  "node_modules/",
+  ".git/",
+  ".obsidian/plugins/",
+];
+
 class HtmlFileSuggestModal extends SuggestModal<TFile> {
   plugin: HtmlViewerPlugin;
 
@@ -86,7 +92,10 @@ export default class HtmlViewerPlugin extends Plugin {
   }
 
   getHtmlFiles(): TFile[] {
-    const excludePatterns = parseExcludePatterns(this.settings.excludedPathPatterns);
+    const excludePatterns = [
+      ...BUILT_IN_EXCLUDED_PATH_PATTERNS,
+      ...parseExcludePatterns(this.settings.excludedPathPatterns),
+    ];
 
     return this.app.vault
       .getFiles()

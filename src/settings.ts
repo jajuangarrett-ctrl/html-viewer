@@ -37,7 +37,7 @@ export class HtmlViewerSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Excluded paths")
-      .setDesc("Hide matching HTML files from the chooser. Add one path fragment or * wildcard pattern per line.")
+      .setDesc("Hide matching HTML files from the chooser. Add one path fragment or * wildcard pattern per line. System folders like node_modules are hidden automatically.")
       .addTextArea((text) => {
         text.inputEl.rows = 8;
         text.inputEl.cols = 48;
