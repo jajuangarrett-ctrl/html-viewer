@@ -6,6 +6,37 @@ function normalizeCompactPath(path: string): string {
   return normalizePath(path).replace(/\s+/g, "");
 }
 
+function splitPathSegments(path: string): string[] {
+  return path
+    .split("/")
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0);
+}
+
+function pathContainsSegmentsInOrder(path: string, pattern: string): boolean {
+  const pathSegments = splitPathSegments(normalizeCompactPath(path));
+  const patternSegments = splitPathSegments(normalizeCompactPath(pattern));
+
+  if (patternSegments.length < 2) {
+    return false;
+  }
+
+  let pathIndex = 0;
+  for (const patternSegment of patternSegments) {
+    const nextIndex = pathSegments.findIndex((segment, index) => {
+      return index >= pathIndex && segment.includes(patternSegment);
+    });
+
+    if (nextIndex === -1) {
+      return false;
+    }
+
+    pathIndex = nextIndex + 1;
+  }
+
+  return true;
+}
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -44,7 +75,11 @@ export function pathMatchesExcludePattern(path: string, pattern: string): boolea
     );
   }
 
-  return normalizedPath.includes(normalizedPattern) || compactPath.includes(compactPattern);
+  return (
+    normalizedPath.includes(normalizedPattern) ||
+    compactPath.includes(compactPattern) ||
+    pathContainsSegmentsInOrder(path, pattern)
+  );
 }
 
 export function isPathExcluded(path: string, patterns: string[]): boolean {

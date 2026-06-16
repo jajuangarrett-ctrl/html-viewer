@@ -50,6 +50,24 @@ describe("pathMatchesExcludePattern", () => {
       )
     ).toBe(true);
   });
+
+  it("matches path pieces in order when the actual path has an extra folder", () => {
+    expect(
+      pathMatchesExcludePattern(
+        "Artifacts/Reusable HTML Design System/templates/starter.html",
+        "Artifacts/Reusable HTML Design System/starter.html"
+      )
+    ).toBe(true);
+  });
+
+  it("does not match ordered path pieces when a required segment is missing", () => {
+    expect(
+      pathMatchesExcludePattern(
+        "Artifacts/Reusable HTML Design System/templates/starter.html",
+        "Artifacts/Other Design System/starter.html"
+      )
+    ).toBe(false);
+  });
 });
 
 describe("isPathExcluded", () => {
