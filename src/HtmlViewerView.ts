@@ -10,6 +10,7 @@ export class HtmlViewerView extends ItemView {
   pathLabel: HTMLElement | null = null;
   currentFile: TFile | null = null;
   currentUrl = "";
+  currentBrowserUrl = "";
   currentPath = "";
 
   constructor(leaf: WorkspaceLeaf, plugin: HtmlViewerPlugin) {
@@ -52,8 +53,9 @@ export class HtmlViewerView extends ItemView {
       attr: { "aria-label": "Open in Browser" },
     });
     browserButton.addEventListener("click", () => {
-      if (this.currentUrl) {
-        window.open(this.currentUrl, "_blank");
+      const browserUrl = this.currentBrowserUrl || this.currentUrl;
+      if (browserUrl) {
+        window.open(browserUrl, "_blank");
       }
     });
 
@@ -83,7 +85,8 @@ export class HtmlViewerView extends ItemView {
       throw new Error("HTML Viewer requires a desktop vault adapter with getBasePath().");
     }
 
-    this.currentUrl = vaultFileToFileUrl(basePath, file.path);
+    this.currentUrl = this.app.vault.getResourcePath(file);
+    this.currentBrowserUrl = vaultFileToFileUrl(basePath, file.path);
     this.currentFile = file;
     this.currentPath = file.path;
     this.updateFrame();
@@ -93,6 +96,7 @@ export class HtmlViewerView extends ItemView {
   loadAbsolutePath(absPath: string): void {
     const normalizedPath = absPath.replace(/\\/g, "/");
     this.currentUrl = absolutePathToFileUrl(absPath);
+    this.currentBrowserUrl = this.currentUrl;
     this.currentFile = null;
     this.currentPath = normalizedPath;
     this.updateFrame();
@@ -142,6 +146,7 @@ export class HtmlViewerView extends ItemView {
 
   private updateFrame(): void {
     if (this.iframe) {
+      this.iframe.removeAttribute("srcdoc");
       this.iframe.src = this.currentUrl;
     }
   }
