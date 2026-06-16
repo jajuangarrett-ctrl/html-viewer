@@ -31,3 +31,30 @@
   height: 100%;
   min-height: 0;
 }
+
+.html-viewer-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.html-viewer-suggestion-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.html-viewer-suggestion-text div,
+.html-viewer-suggestion-text small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.html-viewer-exclude-button {
+  flex: 0 0 auto;
+}
+
+.html-viewer-settings-empty {
+  color: var(--text-muted);
+}

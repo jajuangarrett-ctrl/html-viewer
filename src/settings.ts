@@ -4,11 +4,13 @@ import type HtmlViewerPlugin from "../main";
 export interface HtmlViewerSettings {
   openInNewTab: boolean;
   excludedPathPatterns: string;
+  exactExcludedPaths: string[];
 }
 
 export const DEFAULT_SETTINGS: HtmlViewerSettings = {
   openInNewTab: true,
   excludedPathPatterns: "",
+  exactExcludedPaths: [],
 };
 
 export class HtmlViewerSettingTab extends PluginSettingTab {
@@ -49,5 +51,27 @@ export class HtmlViewerSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           });
       });
+
+    containerEl.createEl("h3", { text: "Hidden files" });
+
+    if (this.plugin.settings.exactExcludedPaths.length === 0) {
+      containerEl.createEl("p", {
+        text: "No individual HTML files are hidden.",
+        cls: "html-viewer-settings-empty",
+      });
+      return;
+    }
+
+    for (const path of this.plugin.settings.exactExcludedPaths) {
+      new Setting(containerEl)
+        .setName(path.split("/").pop() ?? path)
+        .setDesc(path)
+        .addButton((button) =>
+          button.setButtonText("Remove").onClick(async () => {
+            await this.plugin.removeHiddenHtmlFile(path);
+            this.display();
+          })
+        );
+    }
   }
 }

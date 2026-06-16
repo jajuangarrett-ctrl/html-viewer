@@ -1,4 +1,4 @@
-import { Plugin, SuggestModal, TFile } from "obsidian";
+import { Notice, Plugin, SuggestModal, TFile } from "obsidian";
 import { HtmlViewerSettingTab, DEFAULT_SETTINGS, HtmlViewerSettings } from "./src/settings";
 import { HtmlViewerView, VIEW_TYPE_HTML } from "./src/HtmlViewerView";
 import { isPathExcluded, parseExcludePatterns } from "./src/fileFilters";
@@ -30,8 +30,28 @@ class HtmlFileSuggestModal extends SuggestModal<TFile> {
   }
 
   renderSuggestion(file: TFile, el: HTMLElement): void {
-    el.createEl("div", { text: file.name });
-    el.createEl("small", { text: file.path });
+    const row = el.createDiv({ cls: "html-viewer-suggestion" });
+    const text = row.createDiv({ cls: "html-viewer-suggestion-text" });
+    text.createEl("div", { text: file.name });
+    text.createEl("small", { text: file.path });
+
+    const excludeButton = row.createEl("button", {
+      text: "Exclude",
+      cls: "html-viewer-exclude-button",
+      attr: { "aria-label": `Exclude ${file.path} from HTML Viewer chooser` },
+    });
+
+    const stopSelection = (evt: Event) => {
+      evt.preventDefault();
+      evt.stopPropagation();
+    };
+
+    excludeButton.addEventListener("mousedown", stopSelection);
+    excludeButton.addEventListener("click", async (evt) => {
+      stopSelection(evt);
+      await this.plugin.hideHtmlFileFromChooser(file);
+      this.close();
+    });
   }
 
   onChooseSuggestion(file: TFile): void {
@@ -96,16 +116,37 @@ export default class HtmlViewerPlugin extends Plugin {
       ...BUILT_IN_EXCLUDED_PATH_PATTERNS,
       ...parseExcludePatterns(this.settings.excludedPathPatterns),
     ];
+    const exactExcludedPaths = new Set(
+      this.settings.exactExcludedPaths.map((path) => path.toLowerCase())
+    );
 
     return this.app.vault
       .getFiles()
       .filter((file) => file.extension.toLowerCase() === "html")
+      .filter((file) => !exactExcludedPaths.has(file.path.toLowerCase()))
       .filter((file) => !isPathExcluded(file.path, excludePatterns))
       .sort((a, b) => a.path.localeCompare(b.path));
   }
 
+  async hideHtmlFileFromChooser(file: TFile): Promise<void> {
+    if (!this.settings.exactExcludedPaths.includes(file.path)) {
+      this.settings.exactExcludedPaths = [...this.settings.exactExcludedPaths, file.path].sort();
+      await this.saveSettings();
+    }
+
+    new Notice(`Hidden from HTML Viewer chooser: ${file.name}`);
+  }
+
+  async removeHiddenHtmlFile(path: string): Promise<void> {
+    this.settings.exactExcludedPaths = this.settings.exactExcludedPaths.filter(
+      (hiddenPath) => hiddenPath !== path
+    );
+    await this.saveSettings();
+  }
+
   async loadSettings(): Promise<void> {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    this.settings.exactExcludedPaths = this.settings.exactExcludedPaths ?? [];
   }
 
   async saveSettings(): Promise<void> {
