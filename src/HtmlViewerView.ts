@@ -1,4 +1,4 @@
-import { ItemView, TFile, ViewStateResult, WorkspaceLeaf } from "obsidian";
+import { ItemView, Notice, TFile, ViewStateResult, WorkspaceLeaf } from "obsidian";
 import type HtmlViewerPlugin from "../main";
 import { absolutePathToFileUrl, vaultFileToFileUrl } from "./pathUtils";
 
@@ -100,6 +100,7 @@ export class HtmlViewerView extends ItemView {
   currentBrowserUrl = "";
   currentPath = "";
   currentSrcdoc = "";
+  companionLeaf: WorkspaceLeaf | null = null;
   private readonly messageHandler = (event: MessageEvent) => this.handleMessage(event);
 
   constructor(leaf: WorkspaceLeaf, plugin: HtmlViewerPlugin) {
@@ -243,7 +244,7 @@ export class HtmlViewerView extends ItemView {
 
   private async buildSrcdoc(file: TFile): Promise<string> {
     const baseDir = getDirectory(file.path);
-    const originalHtml = await this.app.vault.cachedRead(file);
+    const originalHtml = await this.app.vault.read(file);
     const withInlineStyles = await this.inlineStylesheets(originalHtml, baseDir);
     const withInlineScripts = await this.inlineScripts(withInlineStyles, baseDir);
     return this.injectNavigationBridge(withInlineScripts, baseDir);
@@ -269,7 +270,7 @@ export class HtmlViewerView extends ItemView {
         return tag;
       }
 
-      const css = (await this.app.vault.cachedRead(asset)).replace(/<\/style/gi, "<\\/style");
+      const css = (await this.app.vault.read(asset)).replace(/<\/style/gi, "<\\/style");
       return `<style data-html-viewer-inline="${escapeHtmlAttribute(href)}">\n${css}\n</style>`;
     });
   }
@@ -298,7 +299,7 @@ export class HtmlViewerView extends ItemView {
           .replace(/\s+integrity\s*=\s*(["']).*?\1/gi, "")
           .replace(/\s+crossorigin\s*=\s*(["']).*?\1/gi, "")
           .trim();
-        const js = (await this.app.vault.cachedRead(asset)).replace(/<\/script/gi, "<\\/script");
+        const js = (await this.app.vault.read(asset)).replace(/<\/script/gi, "<\\/script");
 
         return `<script${attrs ? ` ${attrs}` : ""} data-html-viewer-inline="${escapeHtmlAttribute(src)}">\n${js}\n</script>`;
       }
@@ -318,17 +319,32 @@ export class HtmlViewerView extends ItemView {
     }
     return parts.join("/");
   };
-  const isRelativeLocal = (href) => href && !href.startsWith("#") && !href.startsWith("/") && !/^[a-z][a-z0-9+.-]*:/i.test(href);
-  document.addEventListener("click", (event) => {
-    const anchor = event.target.closest && event.target.closest("a[href]");
-    if (!anchor) return;
-    const href = anchor.getAttribute("href");
-    if (!isRelativeLocal(href)) return;
+	  const isRelativeLocal = (href) => href && !href.startsWith("#") && !href.startsWith("/") && !/^[a-z][a-z0-9+.-]*:/i.test(href);
+	  const getVaultControlPath = (href) => {
+	    if (!href || !href.startsWith("obsidian://vault-control-center-open")) return "";
+	    try {
+	      return new URL(href).searchParams.get("path") || "";
+	    } catch {
+	      const match = /[?&]path=([^&]+)/.exec(href);
+	      return match ? decodeURIComponent(match[1]) : "";
+	    }
+	  };
+	  document.addEventListener("click", (event) => {
+	    const anchor = event.target.closest && event.target.closest("a[href]");
+	    if (!anchor) return;
+	    const href = anchor.getAttribute("href");
+	    const vaultControlPath = getVaultControlPath(href);
+	    if (vaultControlPath) {
+	      event.preventDefault();
+	      parent.postMessage({ source: "html-viewer", type: "open-vault-file", path: vaultControlPath }, "*");
+	      return;
+	    }
+	    if (!isRelativeLocal(href)) return;
     const cleanHref = href.split(/[?#]/, 1)[0];
     if (!/\.html?$/i.test(cleanHref)) return;
     event.preventDefault();
     parent.postMessage({ source: "html-viewer", type: "open-vault-html", path: normalize(baseDir ? baseDir + "/" + cleanHref : cleanHref) }, "*");
-  });
+	  }, true);
 })();
 </script>`;
 
@@ -345,14 +361,56 @@ export class HtmlViewerView extends ItemView {
     }
 
     const data = event.data as { source?: unknown; type?: unknown; path?: unknown };
-    if (data?.source !== "html-viewer" || data.type !== "open-vault-html" || typeof data.path !== "string") {
+    if (data?.source !== "html-viewer" || typeof data.path !== "string") {
       return;
     }
 
-    const file = this.app.vault.getAbstractFileByPath(data.path);
-    if (file instanceof TFile && file.extension.toLowerCase() === "html") {
-      void this.loadFile(file);
+    if (data.type === "open-vault-html") {
+      const file = this.app.vault.getAbstractFileByPath(data.path);
+      if (file instanceof TFile && file.extension.toLowerCase() === "html") {
+        void this.loadFile(file);
+      }
+      return;
     }
+
+    if (data.type === "open-vault-file") {
+      void this.openCompanionFile(data.path);
+    }
+  }
+
+  private async openCompanionFile(path: string): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) {
+      new Notice(`File not found: ${path}`);
+      return;
+    }
+
+    const leaf = this.getCompanionLeaf();
+    this.companionLeaf = leaf;
+    await leaf.openFile(file);
+  }
+
+  private getCompanionLeaf(): WorkspaceLeaf {
+    if (this.companionLeaf && this.leafStillExists(this.companionLeaf)) {
+      return this.companionLeaf;
+    }
+
+    try {
+      return this.app.workspace.getLeaf("split");
+    } catch {
+      return this.app.workspace.getLeaf(true);
+    }
+  }
+
+  private leafStillExists(targetLeaf: WorkspaceLeaf): boolean {
+    let found = false;
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      if (leaf === targetLeaf) {
+        found = true;
+      }
+    });
+
+    return found;
   }
 
   private updateFrame(): void {
