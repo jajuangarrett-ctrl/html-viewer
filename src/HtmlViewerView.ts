@@ -319,32 +319,24 @@ export class HtmlViewerView extends ItemView {
     }
     return parts.join("/");
   };
-	  const isRelativeLocal = (href) => href && !href.startsWith("#") && !href.startsWith("/") && !/^[a-z][a-z0-9+.-]*:/i.test(href);
-	  const getVaultControlPath = (href) => {
-	    if (!href || !href.startsWith("obsidian://vault-control-center-open")) return "";
-	    try {
-	      return new URL(href).searchParams.get("path") || "";
-	    } catch {
-	      const match = /[?&]path=([^&]+)/.exec(href);
-	      return match ? decodeURIComponent(match[1]) : "";
-	    }
-	  };
-	  document.addEventListener("click", (event) => {
-	    const anchor = event.target.closest && event.target.closest("a[href]");
-	    if (!anchor) return;
-	    const href = anchor.getAttribute("href");
-	    const vaultControlPath = getVaultControlPath(href);
-	    if (vaultControlPath) {
-	      event.preventDefault();
-	      parent.postMessage({ source: "html-viewer", type: "open-vault-file", path: vaultControlPath }, "*");
-	      return;
-	    }
-	    if (!isRelativeLocal(href)) return;
+  const isRelativeLocal = (href) => href && !href.startsWith("#") && !href.startsWith("/") && !/^[a-z][a-z0-9+.-]*:/i.test(href);
+  document.addEventListener("click", (event) => {
+    const anchor = event.target.closest && event.target.closest("a[href]");
+    if (!anchor) return;
+    const href = anchor.getAttribute("href");
+    const vaultFilePath = anchor.getAttribute("data-vault-file-path");
+    if (vaultFilePath && window.parent !== window) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      parent.postMessage({ source: "html-viewer", type: "open-vault-file", path: vaultFilePath }, "*");
+      return;
+    }
+    if (!isRelativeLocal(href)) return;
     const cleanHref = href.split(/[?#]/, 1)[0];
     if (!/\.html?$/i.test(cleanHref)) return;
     event.preventDefault();
     parent.postMessage({ source: "html-viewer", type: "open-vault-html", path: normalize(baseDir ? baseDir + "/" + cleanHref : cleanHref) }, "*");
-	  }, true);
+  }, true);
 })();
 </script>`;
 
@@ -379,15 +371,22 @@ export class HtmlViewerView extends ItemView {
   }
 
   private async openCompanionFile(path: string): Promise<void> {
-    const file = this.app.vault.getAbstractFileByPath(path);
+    const normalizedPath = normalizeVaultPath(path);
+    const file = this.app.vault.getAbstractFileByPath(normalizedPath);
     if (!(file instanceof TFile)) {
-      new Notice(`File not found: ${path}`);
+      new Notice(`File not found: ${normalizedPath || path}`);
       return;
     }
 
     const leaf = this.getCompanionLeaf();
     this.companionLeaf = leaf;
-    await leaf.openFile(file);
+    try {
+      await leaf.openFile(file);
+      this.app.workspace.setActiveLeaf(leaf, { focus: true });
+    } catch (error) {
+      console.error(`HTML Viewer could not open companion file: ${normalizedPath}`, error);
+      new Notice(`Unable to open file: ${normalizedPath}`);
+    }
   }
 
   private getCompanionLeaf(): WorkspaceLeaf {
@@ -395,11 +394,7 @@ export class HtmlViewerView extends ItemView {
       return this.companionLeaf;
     }
 
-    try {
-      return this.app.workspace.getLeaf("split");
-    } catch {
-      return this.app.workspace.getLeaf(true);
-    }
+    return this.app.workspace.getLeaf("tab");
   }
 
   private leafStillExists(targetLeaf: WorkspaceLeaf): boolean {
