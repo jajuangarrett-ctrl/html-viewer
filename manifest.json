@@ -1,7 +1,7 @@
 {
   "id": "html-viewer",
   "name": "HTML Viewer",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "minAppVersion": "1.4.0",
   "description": "Open local HTML files inside Obsidian in a dedicated tab.",
   "author": "Franklin Garrett",

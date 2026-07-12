@@ -352,10 +352,17 @@ export class HtmlViewerView extends ItemView {
       return;
     }
 
-    const data = event.data as { source?: unknown; type?: unknown; path?: unknown };
-    if (data?.source !== "html-viewer" || typeof data.path !== "string") {
+    const data = event.data as { source?: unknown; type?: unknown; path?: unknown; page?: unknown };
+    if (data?.source !== "html-viewer") {
       return;
     }
+
+    if (data.type === "reload-vault-html") {
+      void this.reloadCurrentFile(typeof data.page === "string" ? data.page : "");
+      return;
+    }
+
+    if (typeof data.path !== "string") return;
 
     if (data.type === "open-vault-html") {
       const file = this.app.vault.getAbstractFileByPath(data.path);
@@ -367,6 +374,28 @@ export class HtmlViewerView extends ItemView {
 
     if (data.type === "open-vault-file") {
       void this.openCompanionFile(data.path);
+    }
+  }
+
+  private async reloadCurrentFile(page: string): Promise<void> {
+    if (!this.currentFile) return;
+
+    const iframe = this.iframe;
+    const restorePage = () => {
+      iframe?.contentWindow?.postMessage(
+        { source: "html-viewer", type: "set-dashboard-page", page },
+        "*"
+      );
+    };
+
+    if (iframe && page) iframe.addEventListener("load", restorePage, { once: true });
+
+    try {
+      await this.loadFile(this.currentFile);
+    } catch (error) {
+      if (iframe && page) iframe.removeEventListener("load", restorePage);
+      console.error("HTML Viewer could not reload the current HTML file.", error);
+      new Notice("Unable to reload this HTML file.");
     }
   }
 
