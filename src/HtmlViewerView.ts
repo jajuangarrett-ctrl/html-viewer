@@ -1,6 +1,7 @@
 import { ItemView, Notice, TFile, ViewStateResult, WorkspaceLeaf } from "obsidian";
 import type HtmlViewerPlugin from "../main";
 import { absolutePathToFileUrl, vaultFileToFileUrl } from "./pathUtils";
+import { appendToDocumentBody } from "./htmlDocument";
 
 export const VIEW_TYPE_HTML = "html-viewer";
 
@@ -340,11 +341,7 @@ export class HtmlViewerView extends ItemView {
 })();
 </script>`;
 
-    if (/<\/body\s*>/i.test(html)) {
-      return html.replace(/<\/body\s*>/i, `${bridge}\n</body>`);
-    }
-
-    return `${html}\n${bridge}`;
+    return appendToDocumentBody(html, bridge);
   }
 
   private handleMessage(event: MessageEvent): void {
