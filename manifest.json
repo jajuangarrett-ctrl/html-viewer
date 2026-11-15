@@ -1,10 +1,10 @@
 {
   "id": "html-viewer",
   "name": "HTML Viewer",
-  "version": "0.1.7",
+  "version": "0.2.0",
   "minAppVersion": "1.4.0",
-  "description": "Open local HTML files inside Obsidian in a dedicated tab.",
+  "description": "Read local HTML and text projects with compact mobile navigation, offline safe mode and explicit trusted interactivity.",
   "author": "Franklin Garrett",
   "authorUrl": "https://github.com/jajuangarrett-ctrl",
-  "isDesktopOnly": true
+  "isDesktopOnly": false
 }

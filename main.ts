@@ -1,6 +1,11 @@
-import { Notice, Plugin, SuggestModal, TFile } from "obsidian";
-import { HtmlViewerSettingTab, DEFAULT_SETTINGS, HtmlViewerSettings } from "./src/settings";
+import { Notice, Plugin, SuggestModal, TFile, TFolder } from "obsidian";
+import {
+  HtmlViewerSettingTab,
+  DEFAULT_SETTINGS,
+  HtmlViewerSettings,
+} from "./src/settings";
 import { HtmlViewerView, VIEW_TYPE_HTML } from "./src/HtmlViewerView";
+import { isPage, safePath, pagePath, inRoot } from "./src/core";
 import { isPathExcluded, parseExcludePatterns } from "./src/fileFilters";
 
 const BUILT_IN_EXCLUDED_PATH_PATTERNS = [
@@ -8,6 +13,32 @@ const BUILT_IN_EXCLUDED_PATH_PATTERNS = [
   ".git/",
   ".obsidian/plugins/",
 ];
+
+class FolderSuggestModal extends SuggestModal<TFolder> {
+  constructor(
+    private plugin: HtmlViewerPlugin,
+    private view: HtmlViewerView,
+  ) {
+    super(plugin.app);
+    this.setPlaceholder("Choose a project folder in the vault");
+  }
+  getSuggestions(query: string) {
+    return this.app.vault
+      .getAllLoadedFiles()
+      .filter(
+        (f): f is TFolder =>
+          f instanceof TFolder &&
+          safePath(f.path) &&
+          f.path.toLowerCase().includes(query.toLowerCase()),
+      );
+  }
+  renderSuggestion(folder: TFolder, el: HTMLElement) {
+    el.setText(folder.path);
+  }
+  onChooseSuggestion(folder: TFolder) {
+    void this.view.addFolder(folder);
+  }
+}
 
 class HtmlFileSuggestModal extends SuggestModal<TFile> {
   plugin: HtmlViewerPlugin;
@@ -66,7 +97,7 @@ export default class HtmlViewerPlugin extends Plugin {
     await this.loadSettings();
 
     this.registerView(VIEW_TYPE_HTML, (leaf) => new HtmlViewerView(leaf, this));
-    this.registerExtensions(["html"], VIEW_TYPE_HTML);
+    this.registerExtensions(["html", "htm"], VIEW_TYPE_HTML);
 
     this.addRibbonIcon("code-2", "Open HTML file", () => {
       this.openFileSuggestModal();
@@ -80,7 +111,7 @@ export default class HtmlViewerPlugin extends Plugin {
 
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu, file) => {
-        if (file instanceof TFile && file.extension === "html") {
+        if (file instanceof TFile && isPage(file.path)) {
           menu.addItem((item) => {
             item
               .setTitle("Open in HTML Viewer")
@@ -88,7 +119,7 @@ export default class HtmlViewerPlugin extends Plugin {
               .onClick(() => this.openHtmlFile(file));
           });
         }
-      })
+      }),
     );
 
     this.addSettingTab(new HtmlViewerSettingTab(this.app, this));
@@ -101,10 +132,10 @@ export default class HtmlViewerPlugin extends Plugin {
       state: { file: file.path },
       active: true,
     });
+  }
 
-    if (leaf.view instanceof HtmlViewerView) {
-      leaf.view.loadFile(file);
-    }
+  openFolderSuggestModal(view: HtmlViewerView): void {
+    new FolderSuggestModal(this, view).open();
   }
 
   openFileSuggestModal(): void {
@@ -117,12 +148,12 @@ export default class HtmlViewerPlugin extends Plugin {
       ...parseExcludePatterns(this.settings.excludedPathPatterns),
     ];
     const exactExcludedPaths = new Set(
-      this.settings.exactExcludedPaths.map((path) => path.toLowerCase())
+      this.settings.exactExcludedPaths.map((path) => path.toLowerCase()),
     );
 
     return this.app.vault
       .getFiles()
-      .filter((file) => file.extension.toLowerCase() === "html")
+      .filter((file) => isPage(file.path))
       .filter((file) => !exactExcludedPaths.has(file.path.toLowerCase()))
       .filter((file) => !isPathExcluded(file.path, excludePatterns))
       .sort((a, b) => a.path.localeCompare(b.path));
@@ -130,7 +161,10 @@ export default class HtmlViewerPlugin extends Plugin {
 
   async hideHtmlFileFromChooser(file: TFile): Promise<void> {
     if (!this.settings.exactExcludedPaths.includes(file.path)) {
-      this.settings.exactExcludedPaths = [...this.settings.exactExcludedPaths, file.path].sort();
+      this.settings.exactExcludedPaths = [
+        ...this.settings.exactExcludedPaths,
+        file.path,
+      ].sort();
       await this.saveSettings();
     }
 
@@ -139,14 +173,40 @@ export default class HtmlViewerPlugin extends Plugin {
 
   async removeHiddenHtmlFile(path: string): Promise<void> {
     this.settings.exactExcludedPaths = this.settings.exactExcludedPaths.filter(
-      (hiddenPath) => hiddenPath !== path
+      (hiddenPath) => hiddenPath !== path,
     );
     await this.saveSettings();
   }
 
   async loadSettings(): Promise<void> {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-    this.settings.exactExcludedPaths = this.settings.exactExcludedPaths ?? [];
+    this.settings.exactExcludedPaths = Array.isArray(
+      this.settings.exactExcludedPaths,
+    )
+      ? this.settings.exactExcludedPaths.filter(
+          (p: unknown) => typeof p === "string",
+        )
+      : [];
+    this.settings.allowExternal = this.settings.allowExternal === true;
+    this.settings.projects = Array.isArray(this.settings.projects)
+      ? this.settings.projects
+          .filter(
+            (p) =>
+              p &&
+              typeof p.id === "string" &&
+              typeof p.entry === "string" &&
+              safePath(p.entry) &&
+              typeof p.root === "string" &&
+              (!p.root || safePath(p.root)) &&
+              typeof p.last === "string" &&
+              safePath(pagePath(p.last)) &&
+              typeof p.name === "string" &&
+              (p.root
+                ? inRoot(p.entry, p.root) && inRoot(pagePath(p.last), p.root)
+                : pagePath(p.last) === p.entry),
+          )
+          .map((p) => ({ ...p, trusted: p.trusted === true }))
+      : [];
   }
 
   async saveSettings(): Promise<void> {

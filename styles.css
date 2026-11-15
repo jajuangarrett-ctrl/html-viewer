@@ -2,47 +2,167 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 0;
+  min-height: 0;
+  padding: 0 !important;
+  overflow: hidden;
+  container-type: inline-size;
+  background: var(--background-primary);
 }
-
 .html-viewer-navbar {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--background-modifier-border);
-  background: var(--background-secondary);
+  gap: 4px;
+  min-height: 44px;
   flex-shrink: 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding: 0 4px;
 }
-
-.html-viewer-navbar .html-viewer-path {
+.html-viewer-icon {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 10px !important;
+  border: 0 !important;
+  border-radius: 8px;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+.html-viewer-icon svg {
+  width: 24px;
+  height: 24px;
+}
+.html-viewer-path {
   flex: 1;
-  font-size: 12px;
-  color: var(--text-muted);
-  white-space: nowrap;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-ui-small);
 }
-
-.html-viewer-iframe {
+.html-viewer-body {
+  display: flex;
   flex: 1;
-  border: none;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.html-viewer-library {
+  width: 100%;
+  min-width: 0;
+  overflow: auto;
+  padding: 8px;
+  overscroll-behavior: contain;
+}
+.html-viewer-library[hidden],
+.html-viewer-iframe[hidden],
+.html-viewer-notice[hidden],
+.html-viewer-navbar [hidden] {
+  display: none !important;
+}
+.html-viewer-wide .html-viewer-library {
+  width: clamp(240px, 28%, 310px);
+  flex-shrink: 0;
+  border-right: 1px solid var(--background-modifier-border);
+}
+.html-viewer-library-head,
+.html-viewer-library-actions,
+.html-viewer-project {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.html-viewer-library-head strong {
+  flex: 1;
+}
+.html-viewer-library input {
+  width: 100%;
+  min-height: 44px;
+  margin-bottom: 8px;
+}
+.html-viewer-list h3 {
+  font-size: var(--font-ui-small);
+  margin: 12px 0 4px;
+  color: var(--text-muted);
+}
+.html-viewer-project > button:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  text-align: start;
+  min-height: 44px;
+  height: auto;
+  padding: 8px;
+}
+.html-viewer-page {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  height: auto;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: start;
+  padding: 8px;
+  margin-bottom: 4px;
+  box-shadow: none;
+  background: transparent;
+}
+.html-viewer-list [aria-current="true"] {
+  background: var(--background-modifier-hover);
+  color: var(--interactive-accent);
+}
+.html-viewer-reader {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+.html-viewer-container:not(.html-viewer-wide).html-viewer-library-open
+  .html-viewer-reader {
+  display: none;
+}
+.html-viewer-iframe {
+  display: block;
+  flex: 1;
   width: 100%;
   height: 100%;
   min-height: 0;
+  border: 0;
+  background: var(--background-primary);
 }
-
+.html-viewer-notice {
+  font-size: var(--font-ui-smaller);
+  padding: 4px 8px;
+  max-height: 76px;
+  overflow: auto;
+  border-bottom: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+}
+.html-viewer-dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.html-viewer-dialog-buttons button {
+  min-height: 44px;
+}
+.html-viewer-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16/9;
+  border: 0;
+}
 .html-viewer-suggestion {
   display: flex;
-  align-items: center;
   gap: 12px;
+  align-items: center;
 }
-
 .html-viewer-suggestion-text {
   flex: 1;
   min-width: 0;
 }
-
 .html-viewer-suggestion-text div,
 .html-viewer-suggestion-text small {
   display: block;
@@ -50,11 +170,11 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 .html-viewer-exclude-button {
-  flex: 0 0 auto;
+  min-height: 44px;
 }
-
-.html-viewer-settings-empty {
-  color: var(--text-muted);
+@media (prefers-reduced-motion: reduce) {
+  .html-viewer-container * {
+    scroll-behavior: auto !important;
+  }
 }

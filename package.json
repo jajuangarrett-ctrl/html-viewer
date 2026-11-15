@@ -1,12 +1,16 @@
 {
   "name": "html-viewer",
-  "version": "0.1.7",
+  "version": "0.2.0",
   "description": "Open local HTML files inside Obsidian in a dedicated tab.",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit --skipLibCheck",
+    "test:browser": "playwright test",
+    "build:harness": "node tests/build.mjs",
+    "check": "npm run typecheck && npm test && npm run build && npm run build:harness && npm run test:browser"
   },
   "keywords": [
     "obsidian-plugin",
@@ -17,13 +21,23 @@
   "author": "Franklin Garrett",
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "^20.12.7",
+    "@playwright/test": "^1.65.1",
+    "@types/node": "^24.10.0",
     "builtin-modules": "3.3.0",
-    "esbuild": "0.20.2",
+    "esbuild": "^0.28.2",
     "jsdom": "^26.1.0",
-    "obsidian": "latest",
+    "obsidian": "^1.14.4",
+    "prettier": "^3.10.1",
     "tslib": "2.6.2",
+    "tsx": "^4.23.15",
     "typescript": "5.4.5",
-    "vitest": "^1.6.0"
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  },
+  "dependencies": {
+    "dompurify": "^3.4.18",
+    "parse5": "^8.1.1",
+    "postcss": "^8.5.33",
+    "postcss-value-parser": "^4.2.0"
   }
 }

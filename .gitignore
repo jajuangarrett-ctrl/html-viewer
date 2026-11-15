@@ -7,3 +7,9 @@ data.json
 Thumbs.db
 .vscode/
 .idea/
+test-results/
+playwright-report/
+tests/results.json
+tests/screenshots/
+tests/browser/harness.js
+dist/
