@@ -28,6 +28,12 @@ export class ItemView {
     this.app = leaf.app;
     this.contentEl = leaf.contentEl;
   }
+  addAction(icon: string, title: string, callback: () => void) {
+    let header = document.querySelector("#host-header");
+    if (!header) { header = document.createElement("header"); header.id="host-header"; this.contentEl.before(header); }
+    header.replaceChildren();
+    const b = document.createElement("div"); b.setAttribute("aria-label", title); b.onclick=callback; header.append(b); return b;
+  }
   registerDomEvent(target: any, event: string, fn: any) {
     target.addEventListener(event, fn);
   }

@@ -8,7 +8,7 @@ async function start(page: Page, opts: any = {}) {
 }
 async function menu(page: Page, item: string) {
   await page.getByRole("button", { name: "Page Options", exact: true }).click();
-  await page.getByRole("button", { name: item, exact: true }).click();
+  await page.locator("#test-menu").getByRole("button", { name: item, exact: true }).click();
 }
 const reader = (page: Page) => page.frameLocator("iframe.html-viewer-iframe");
 test("safe renderer: local CSS/assets, no original script or network", async ({
@@ -436,4 +436,53 @@ test("safe generated Sections handles touch gestures and ignores hidden headings
     .getByRole("button", { name: "Page Sections", exact: true })
     .click();
   await expect(nav).toBeHidden();
+});
+
+for (const width of [390, 852, 1200]) {
+  test(`Focus Reading keeps full width, live state and top-line access at ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 740 });
+    await start(page, { trusted: true });
+    const frame = reader(page);
+    await frame.locator('#draft').fill('Retained draft');
+    await frame.locator('#counter').click();
+    await frame.locator('body').evaluate(() => window.scrollTo(0, 200));
+    const original = await page.locator('iframe.html-viewer-iframe').elementHandle();
+    const before = await page.locator('iframe.html-viewer-iframe').boundingBox();
+    const scroll = await frame.locator('body').evaluate(() => scrollY);
+    await menu(page, 'Focus Reading');
+    await expect(page.locator('.html-viewer-navbar')).toBeHidden();
+    const exit = page.getByRole('button', { name:'Show reader controls', exact:true });
+    await expect(exit).toBeVisible();
+    const after = await page.locator('iframe.html-viewer-iframe').boundingBox();
+    console.log(`FOCUS_METRICS ${width}: ${JSON.stringify({before,after})}`);
+    if (width === 390 || width === 852) await page.screenshot({path:`tests/screenshots/focus-${width}.png`});
+    expect(after!.width).toBe(before!.width);
+    expect(after!.height - before!.height).toBeGreaterThanOrEqual(44);
+    expect(await frame.locator('body').evaluate(() => scrollY)).toBe(scroll);
+    await expect(frame.locator('#draft')).toHaveValue('Retained draft');
+    await expect(frame.locator('#counter')).toHaveText('1');
+    expect(await original!.evaluate(el => el === document.querySelector('iframe'))).toBe(true);
+    // First visible line and corners remain iframe hit targets, never covered by exit chrome.
+    for (const x of [after!.x+2, after!.x+after!.width-2]) {
+      expect(await page.evaluate(({x,y})=> document.elementFromPoint(x,y)?.tagName, {x,y:after!.y+2})).toBe('IFRAME');
+    }
+    await page.setViewportSize({ width, height: 330 }); // keyboard-sized host
+    await expect(exit).toBeVisible();
+    await exit.press('Enter');
+    await expect(page.locator('.html-viewer-navbar')).toBeVisible();
+    await expect(page.getByRole('button',{name:'Page Options',exact:true})).toBeFocused();
+    await expect(frame.locator('#draft')).toHaveValue('Retained draft');
+    await expect(frame.locator('#counter')).toHaveText('1');
+    expect(await original!.evaluate(el => el === document.querySelector('iframe'))).toBe(true);
+  });
+}
+test('safe Sections remains usable after focus and command fallback without host header', async ({page}) => {
+  await start(page);
+  await menu(page,'Focus Reading');
+  await page.locator('#host-header').evaluate(el => (el as HTMLElement).hidden=true);
+  // Same public view method invoked by the registered plugin command.
+  await page.evaluate(() => (window as any).view.toggleFocusReading());
+  await expect(page.locator('.html-viewer-navbar')).toBeVisible();
+  await page.getByRole('button',{name:'Page Sections',exact:true}).click();
+  await expect(reader(page).locator('[data-fjg-safe-sections]')).toBeVisible();
 });

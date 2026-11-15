@@ -109,6 +109,17 @@ export default class HtmlViewerPlugin extends Plugin {
       callback: () => this.openFileSuggestModal(),
     });
 
+    this.addCommand({
+      id: "toggle-focus-reading",
+      name: "Toggle Focus Reading / show reader controls",
+      checkCallback: (checking) => {
+        const view = this.app.workspace.getActiveViewOfType(HtmlViewerView);
+        if (!view) return false;
+        if (!checking) view.toggleFocusReading();
+        return true;
+      },
+    });
+
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu, file) => {
         if (file instanceof TFile && isPage(file.path)) {

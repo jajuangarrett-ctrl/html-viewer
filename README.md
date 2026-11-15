@@ -67,3 +67,11 @@ The plugin is a viewer, not a website editor. It does not persist changes a dash
 Node 24 is used for the test toolchain. `npm ci`, then `npx playwright install chromium webkit`, then `npm run check`. Browser tests use synthetic documents and the actual view/renderer with a minimal Obsidian host adapter. They do not use personal vault documents.
 
 See [VALIDATION.md](VALIDATION.md) for the checked matrix and remaining physical-device acceptance. No real iPhone installation or YouTube playback is implied by browser tests.
+
+## Focus Reading (0.2.2)
+
+Choose **Page Options → Focus Reading** to hide this plugin’s Library/title/options toolbar. A **Show reader controls** action remains in Obsidian’s existing view header; activating it restores Library, Page Sections and Page Options. The host tabs/title bar and any header inside the HTML document are unchanged. No side gutter or overlay covers document text. The same iframe, scroll position, draft and interactive state stay alive; natural scroll clamping can occur at the document end when more content becomes visible.
+
+If your theme or Obsidian settings hide the view header, use the command palette: **HTML Viewer: Toggle Focus Reading / show reader controls**. Focus mode is per open view and resets when the view is recreated. It does not modify global settings or the source document.
+
+Synthetic Chromium/WebKit checks cover 390/852/1200px widths, keyboard-height resizing, unchanged reading width and increased height, top-line hit targets, retained drafts/script state/iframe identity, and safe Sections after reveal. Actual mobile Obsidian header/palette integration still needs a physical-device check.

@@ -178,3 +178,7 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Only this plugin's toolbar is collapsed. Host tabs/header are untouched. */
+.html-viewer-navbar[hidden] { display: none !important; }
+.html-viewer-focus-action { min-width: 44px; min-height: 44px; }

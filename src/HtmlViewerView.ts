@@ -69,6 +69,10 @@ export class HtmlViewerView extends ItemView {
   private title!: HTMLElement;
   private notice!: HTMLElement;
   private section!: HTMLButtonElement;
+  private focusReading = false;
+  private focusAction?: HTMLElement;
+  private toolbar?: HTMLElement;
+  private optionsButton?: HTMLButtonElement;
   private search = "";
   private openLibrary = false;
   private zoom = 1;
@@ -93,6 +97,15 @@ export class HtmlViewerView extends ItemView {
     root.empty();
     root.addClass("html-viewer-container");
     const bar = root.createDiv({ cls: "html-viewer-navbar" });
+    this.toolbar = bar;
+    this.focusAction = this.addAction("maximize", "Focus Reading", () => this.toggleFocusReading());
+    this.focusAction.addClass("html-viewer-focus-action");
+    this.focusAction.setAttribute("role", "button");
+    this.focusAction.setAttribute("tabindex", "0");
+    this.registerDomEvent(this.focusAction, "keydown", (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this.toggleFocusReading(); }
+    });
+    this.updateFocusReading();
     let skipLibraryClick = false;
     const library = this.button(bar, "Library and Pages", "panel-left", () => {
       if (skipLibraryClick) {
@@ -113,6 +126,7 @@ export class HtmlViewerView extends ItemView {
     const options = this.button(bar, "Page Options", "ellipsis", () =>
       this.options(options),
     );
+    this.optionsButton = options;
     const body = root.createDiv({ cls: "html-viewer-body" });
     this.sidebar = body.createEl("aside", {
       cls: "html-viewer-library",
@@ -230,6 +244,8 @@ export class HtmlViewerView extends ItemView {
     this.generation++;
     this.video?.close();
     this.resize?.disconnect();
+    this.focusAction?.remove();
+    this.focusAction = undefined;
     this.iframe?.remove();
     this.iframe = null;
   }
@@ -246,6 +262,22 @@ export class HtmlViewerView extends ItemView {
     setIcon(b, icon);
     b.onclick = callback;
     return b;
+  }
+  toggleFocusReading(value = !this.focusReading) {
+    this.focusReading = value;
+    if (value) this.toggleLibrary(false);
+    this.updateFocusReading();
+    // Controls live in the host header, never above HTML text inside the frame.
+    if (!value) this.optionsButton?.focus();
+    else this.focusAction?.focus();
+  }
+  private updateFocusReading() {
+    if (this.toolbar) this.toolbar.hidden = this.focusReading;
+    const label = this.focusReading ? "Show reader controls" : "Focus Reading";
+    this.focusAction?.setAttribute("aria-label", label);
+    this.focusAction?.setAttribute("title", label);
+    this.focusAction?.setAttribute("aria-pressed", String(this.focusReading));
+    if (this.focusAction) setIcon(this.focusAction, this.focusReading ? "minimize" : "maximize");
   }
   private updateLibrary() {
     this.sidebar.hidden = !this.openLibrary;
@@ -547,6 +579,8 @@ export class HtmlViewerView extends ItemView {
     const menu = new Menu();
     const add = (name: string, fn: () => void, disabled = false) =>
       menu.addItem((i) => i.setTitle(name).setDisabled(disabled).onClick(fn));
+    add("Focus Reading", () => this.toggleFocusReading(true));
+    menu.addSeparator();
     add(
       "Back",
       () => {
