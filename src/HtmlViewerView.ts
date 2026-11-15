@@ -444,7 +444,8 @@ export class HtmlViewerView extends ItemView {
       if (typeof d.value.title === "string" && d.value.title)
         this.title.setText(d.value.title.slice(0, 300));
       this.section.hidden = !(
-        this.project?.trusted && d.value.sections === true
+        (this.project?.trusted || this.rendered.pageOwned) &&
+        d.value.sections === true
       );
     }
     if (

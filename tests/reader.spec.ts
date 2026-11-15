@@ -353,3 +353,87 @@ test("conditional CSS import stays conditional on the reader width", async ({
     "rgb(0, 100, 100)",
   );
 });
+
+test("safe page-owned Sections works without document scripts, in compact and wide panes", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 740 });
+  const requests: string[] = [];
+  page.on("request", (r) => {
+    if (r.url().includes("/probe")) requests.push(r.url());
+  });
+  await start(page, {
+    files: {
+      "Demo/index.html": `<meta name="fjg-navigation" content="page-sections"><title>Example guide</title><style>body{margin:0}nav.toc{display:none}main{padding:16px}section{min-height:800px}#sectionMenuButton{position:fixed;top:0;left:0}</style><button id="sectionMenuButton">Sections</button><nav class="toc"><a href="#one">First section</a><a href="#two">Second section</a></nav><main><section id="one"><h1>Example guide</h1><input id="draft"><p>First paragraph</p></section><section id="two"><h2>Second section</h2><p>Last paragraph</p></section></main><script>fetch('/probe');document.querySelector('#sectionMenuButton').onclick=()=>{throw Error('must not run')}</script>`,
+    },
+  });
+  const frame = reader(page),
+    nav = frame.locator("[data-fjg-safe-sections] nav");
+  await expect(nav).toBeHidden();
+  await frame.locator("#draft").fill("keep this");
+  await frame.locator("#sectionMenuButton").click();
+  await expect(nav).toBeVisible();
+  await nav
+    .getByRole("button", { name: "Second section", exact: true })
+    .click();
+  await expect(nav).toBeHidden();
+  await expect(frame.locator("#two")).toBeInViewport();
+  await page
+    .getByRole("button", { name: "Page Sections", exact: true })
+    .click();
+  await expect(nav).toBeVisible();
+  await nav.getByRole("button", { name: "Hide sections" }).click();
+  await expect(nav).toBeHidden();
+  await page.setViewportSize({ width: 867, height: 740 });
+  await expect(nav).toBeVisible();
+  await page.screenshot({ path: "tests/screenshots/safe-sections-wide.png" });
+  await expect(frame.locator("#draft")).toHaveValue("keep this");
+  await expect(frame.locator("html")).toHaveCSS("padding-left", "280px");
+  await page
+    .getByRole("button", { name: "Page Sections", exact: true })
+    .click();
+  await expect(nav).toBeHidden();
+  await expect(frame.locator("html")).toHaveCSS("padding-left", "0px");
+  expect(requests).toEqual([]);
+});
+
+test("safe generated Sections handles touch gestures and ignores hidden headings", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 740 });
+  await start(page, {
+    files: {
+      "Demo/index.html":
+        '<meta name="fjg-navigation" content="page-sections"><button hidden data-fjg-section-toggle>Hidden control</button><main><h1>Public guide</h1><h2>Public chapter</h2><section hidden><h2>Hidden chapter</h2></section><input id="draft"></main>',
+    },
+  });
+  const frame = reader(page),
+    toggle = frame.locator("[data-fjg-section-toggle]"),
+    nav = frame.locator("[data-fjg-safe-sections] nav");
+  await expect(nav).toBeHidden();
+  await toggle.dispatchEvent("pointerdown", {
+    clientX: 10,
+    clientY: 10,
+    pointerId: 1,
+    pointerType: "touch",
+  });
+  await toggle.dispatchEvent("pointerup", {
+    clientX: 90,
+    clientY: 12,
+    pointerId: 1,
+    pointerType: "touch",
+  });
+  await expect(nav).toBeVisible();
+  await expect(nav).not.toContainText("Hidden chapter");
+  await frame
+    .locator("[data-fjg-safe-sections] .shade")
+    .click({ position: { x: 380, y: 400 } });
+  await expect(nav).toBeHidden();
+  await page.waitForTimeout(260);
+  await toggle.click();
+  await expect(nav).toBeVisible();
+  await page
+    .getByRole("button", { name: "Page Sections", exact: true })
+    .click();
+  await expect(nav).toBeHidden();
+});

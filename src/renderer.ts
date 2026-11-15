@@ -1,3 +1,4 @@
+import { safeSectionsBootstrap } from "./safeSections";
 import { inertDocument } from "./inertDocument";
 import DOMPurify from "dompurify";
 import postcss from "postcss";
@@ -320,8 +321,9 @@ export function preparePage(
  const report=()=>{const s=sections();send('meta',{title:document.title,sections:s.length===1});};
  const activate=e=>{const a=e.target.closest?.('a,area,[data-fjg-href]');if(!a)return;const href=a.getAttribute('data-fjg-href')||a.getAttribute('href');if(!href)return;e.preventDefault();e.stopPropagation();if(href.startsWith('#')){try{document.getElementById(decodeURIComponent(href.slice(1)))?.scrollIntoView();}catch{}return;}send('link',href);};
  document.addEventListener('click',activate,true);document.addEventListener('keydown',e=>{if(e.key==='Enter')activate(e)},true);document.addEventListener('submit',e=>e.preventDefault(),true);
- addEventListener('message',e=>{if(e.source!==parent||e.data?.nonce!==nonce)return;if(e.data.type==='sections'){const s=sections();if(s.length===1){s[0].focus();s[0].click();}}if(e.data.type==='scale'){document.documentElement.style.zoom=String(Math.min(2,Math.max(.5,Number(e.data.value)||1)));}});
- const start=()=>{report();const hash=page.split('#')[1];if(hash){try{document.getElementById(decodeURIComponent(hash))?.scrollIntoView();}catch{}}new MutationObserver(()=>report()).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['hidden','disabled','style','class']});};
+ addEventListener('message',e=>{if(e.source!==parent||e.data?.nonce!==nonce)return;if(e.data.type==='sections'){const s=sections();if(s.length===1){s[0].focus({preventScroll:true});s[0].click();}}if(e.data.type==='scale'){document.documentElement.style.zoom=String(Math.min(2,Math.max(.5,Number(e.data.value)||1)));}});
+ ${!trusted && pageOwned ? safeSectionsBootstrap() : ""}
+ const start=()=>{${!trusted && pageOwned ? "installSafeSections();" : ""}report();const hash=page.split('#')[1];if(hash){try{document.getElementById(decodeURIComponent(hash))?.scrollIntoView();}catch{}}new MutationObserver(()=>report()).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['hidden','disabled','style','class']});};
  if(${trusted}){const nativeResponse=Response;window.fetch=async(input,init)=>{if(init?.method&&init.method!=='GET')throw new Error('Local read-only fetch');const raw=typeof input==='string'?input:input instanceof URL?input.href:input.url;const url=new URL(raw,'https://local.invalid/'+page);if(url.origin!=='https://local.invalid')throw new Error('Remote fetch blocked');let p;try{p=decodeURIComponent(url.pathname.slice(1));}catch{throw new Error('Invalid path');}const entry=assets[p];if(!entry)return new nativeResponse('Not found',{status:404});const bytes=Uint8Array.from(atob(entry.data),c=>c.charCodeAt(0));return new nativeResponse(bytes,{headers:{'Content-Type':entry.type}});};
  const store=new Map();const memory={getItem:k=>store.get(String(k))??null,setItem:(k,v)=>store.set(String(k),String(v)),removeItem:k=>store.delete(String(k)),clear:()=>store.clear(),key:i=>[...store.keys()][i]??null,get length(){return store.size}};for(const k of ['localStorage','sessionStorage'])try{Object.defineProperty(window,k,{value:memory});}catch{} }
  addEventListener('DOMContentLoaded',()=>{start();${handlers.join("\n")}});})();`;

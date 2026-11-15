@@ -1,6 +1,6 @@
 # HTML Viewer for Obsidian
 
-**0.2.0** brings the local HTML reading workflow from the companion iOS HTML Viewer into the existing `html-viewer` plugin, now on desktop **and mobile**. It does not replace or change the iOS app.
+**0.2.1** brings the local HTML reading workflow from the companion iOS HTML Viewer into the existing `html-viewer` plugin, now on desktop **and mobile**. It does not replace or change the iOS app.
 
 ## Install or update with BRAT
 
@@ -25,7 +25,7 @@ The source is read-only. No source HTML, attachments, dashboard data, or other v
 - Folding, rotation and Library visibility do not rebuild the iframe. Draft form text, script state and scroll position stay in the same live page. Selecting the current project/page again does not reset it.
 - The plugin fills the space Obsidian assigns. It cannot reclaim an OS-owned rail, hinge/system area, or Obsidian-owned chrome. No model-name or guessed hinge-width heuristics are used.
 
-Opted-in dashboards can keep their own section menu separate from Library. Add `<meta name="fjg-navigation" content="page-sections">` and one visible, enabled `[data-fjg-section-toggle]` button. In trusted mode, **Page Sections** invokes that button's existing handler. It does not expose hidden admin sections or invent authorization rules. Duplicate visible selectors or an active dialog disable the shortcut.
+Opted-in dashboards can keep their own section menu separate from Library. Add `<meta name="fjg-navigation" content="page-sections">` and one visible, enabled `[data-fjg-section-toggle]` button. In safe mode, opted-in pages get a reader-owned Sections drawer built from visible same-document table-of-contents targets or headings. Both the page’s Sections button and the toolbar open it without enabling document JavaScript. At 640 CSS pixels it docks alongside the document; narrower panes use a dismissible overlay. This is separate from the Library breakpoint. In trusted mode, **Page Sections** invokes the document button’s existing handler. It does not expose hidden admin sections or invent authorization rules. Duplicate visible selectors or an active dialog disable the shortcut.
 
 ## Safe and trusted mode
 
