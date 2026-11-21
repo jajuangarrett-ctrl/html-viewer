@@ -8,7 +8,7 @@ export class TFile {
   name: string;
   basename: string;
   extension: string;
-  stat: { size: number };
+  stat: { size: number; mtime: number };
   parent: TFolder;
   constructor(
     public path: string,
@@ -18,7 +18,7 @@ export class TFile {
     this.basename = this.name.replace(/\.[^.]+$/, "");
     this.extension = this.name.split(".").pop()!;
     this.parent = new TFolder(path.split("/").slice(0, -1).join("/") || "/");
-    this.stat = { size: bytes.byteLength };
+    this.stat = { size: bytes.byteLength, mtime: 1 };
   }
 }
 export class ItemView {

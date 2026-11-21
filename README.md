@@ -1,6 +1,6 @@
 # HTML Viewer for Obsidian
 
-**0.2.1** brings the local HTML reading workflow from the companion iOS HTML Viewer into the existing `html-viewer` plugin, now on desktop **and mobile**. It does not replace or change the iOS app.
+**0.2.3** adds a shared, filtered HTML catalog. The 0.2 series brings the local HTML reading workflow from the companion iOS HTML Viewer into the existing `html-viewer` plugin, now on desktop **and mobile**. It does not replace or change the iOS app.
 
 ## Install or update with BRAT
 
@@ -11,7 +11,7 @@ A manual release contains `main.js`, `manifest.json`, and `styles.css`. Put thos
 ## Open a project
 
 1. Put the HTML file and its local assets in a dedicated folder inside your vault. Keep relative paths intact. Obsidian Sync must actually have downloaded those files on the phone.
-2. Run **HTML Viewer: Open HTML file in viewer**, use the code icon in the ribbon, or choose **Open in HTML Viewer** from the file menu. HTML, HTM, HTML stored in TXT, and plain TXT are supported.
+2. Run **HTML Viewer: Open HTML file in viewer**, use the code icon in the ribbon, or choose **Open in HTML Viewer** from the file menu. HTML and HTM pages with actual HTML content appear in the chooser, Library and Pages. TXT files remain usable as local assets and through explicit **Open in HTML Viewer** file-menu opening, but are not HTML listings.
 3. Tap **Library and Pages** to switch projects or pages. **Add folder** selects an existing vault folder; it is a reference, not a second imported copy. Removing a library reference never deletes files.
 4. **Page Options** offers back/forward, start page, reload from vault, scale, safe/trusted mode, and detected videos.
 
@@ -75,3 +75,12 @@ Choose **Page Options → Focus Reading** to hide this plugin’s Library/title/
 If your theme or Obsidian settings hide the view header, use the command palette: **HTML Viewer: Toggle Focus Reading / show reader controls**. Focus mode is per open view and resets when the view is recreated. It does not modify global settings or the source document.
 
 Synthetic Chromium/WebKit checks cover 390/852/1200px widths, keyboard-height resizing, unchanged reading width and increased height, top-line hit targets, retained drafts/script state/iframe identity, and safe Sections after reveal. Actual mobile Obsidian header/palette integration still needs a physical-device check.
+
+
+## Filtered HTML catalog (0.2.3)
+
+HTML listings require `.html`/`.htm` plus a leading HTML document signature or real structural fragment. Empty/plain-text lookalikes, Markdown fences, escaped examples and TXT assets are omitted. Existing saved references remain stored; invalid/excluded entries are hidden rather than deleted. Folder selection and Pages use the same exact/path exclusions as the chooser. Opening a TXT explicitly remains compatible with earlier versions. Classification is not sanitization or permission to trust scripts; safe/trusted renderer controls are unchanged.
+
+Other enabled plugins can call `app.plugins.plugins["html-viewer"].getHtmlCatalog()` to receive a Promise of readonly `{path, title}` entries. `subscribeHtmlCatalog(listener)` returns an unsubscribe function. Changes are coalesced for vault create/modify/delete/rename, settings and unload, even when no viewer is open. Consumers must refresh on notifications and discard out-of-date async results. Disabled/unavailable providers must not be replaced by an unfiltered vault scan.
+
+Only metadata is returned. No HTML, script, iframe, remote preview URL or trust capability is exposed. VCC may resolve its own safe local raster sidecar thumbnail from the path; it must not execute a page to make a thumbnail. Reads are limited to eligible files up to 8 MB with four concurrent reads and a 64 KiB classification prefix; unreadable files are omitted. Results are cached until invalidation and returned in stable path order.

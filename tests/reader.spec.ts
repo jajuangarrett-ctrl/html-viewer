@@ -486,3 +486,20 @@ test('safe Sections remains usable after focus and command fallback without host
   await page.getByRole('button',{name:'Page Sections',exact:true}).click();
   await expect(reader(page).locator('[data-fjg-safe-sections]')).toBeVisible();
 });
+
+
+test("Library and Pages share filtered HTML catalog and keep text assets explicit-only", async ({page}) => {
+  await start(page, { files: {
+    "Demo/index.html": "<!doctype html><h1>Real page</h1>",
+    "Demo/fragment.htm": "<main><h1>Fragment</h1></main>",
+    "Demo/hidden.html": "<html><body>Hidden</body></html>",
+    "Demo/impostor.html": "An ordinary note mentioning <p> markup.",
+    "Demo/plain.txt": "Ordinary text",
+    "Demo/markup.txt": "<html><body>Text asset</body></html>"
+  }, excluded: ["Demo/hidden.html"] });
+  await page.getByRole("button", {name:"Library and Pages",exact:true}).click();
+  const pages=page.locator(".html-viewer-page");
+  await expect(pages).toHaveText(["fragment.htm","index.html"]);
+  await page.getByRole("button", {name:"fragment.htm",exact:true}).click();
+  await expect(reader(page).locator("h1")).toHaveText("Fragment");
+});

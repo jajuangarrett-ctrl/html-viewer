@@ -1,3 +1,13 @@
+## 0.2.3 catalog update — November 21, 2026
+
+- 37 unit tests passed, including shared content classification, immutable metadata-only results, exclusions, bounded reads, transient failure retry, stale-read invalidation, subscribers/unload, and the actual plugin event/settings wiring with no viewer open.
+- Type-check, production build, browser harness and production dependency audit passed (zero vulnerabilities).
+- All 58 existing/new browser checks passed in Chromium and WebKit (29 scenarios each). The new Library check excludes plain text, HTML-in-TXT, malformed HTML lookalikes and excluded files while retaining genuine HTML fragments. Existing safe/trusted rendering, explicit TXT opening, navigation, resizing and Focus Reading remain covered.
+- VCC integration consumes the same catalog service, never raw HTML preview code. The classifier is shared verbatim with the coordinated File Focus Duo update.
+- No live vault files, installed plugin runtime or physical phone were changed by this work. Synthetic browser checks are not a physical Obsidian mobile acceptance test.
+
+---
+
 # HTML Viewer 0.2.1 validation
 
 ## Verified scope

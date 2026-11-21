@@ -5,8 +5,10 @@ import {
   HtmlViewerSettings,
 } from "./src/settings";
 import { HtmlViewerView, VIEW_TYPE_HTML } from "./src/HtmlViewerView";
-import { isPage, safePath, pagePath, inRoot } from "./src/core";
+import { isReadablePage, safePath, pagePath, inRoot } from "./src/core";
 import { isPathExcluded, parseExcludePatterns } from "./src/fileFilters";
+
+import { HtmlCatalog, HtmlCatalogEntry } from "./src/htmlCatalog";
 
 const BUILT_IN_EXCLUDED_PATH_PATTERNS = [
   "node_modules/",
@@ -22,13 +24,15 @@ class FolderSuggestModal extends SuggestModal<TFolder> {
     super(plugin.app);
     this.setPlaceholder("Choose a project folder in the vault");
   }
-  getSuggestions(query: string) {
+  async getSuggestions(query: string) {
+    const catalog = await this.plugin.getHtmlCatalog();
     return this.app.vault
       .getAllLoadedFiles()
       .filter(
         (f): f is TFolder =>
           f instanceof TFolder &&
           safePath(f.path) &&
+          catalog.some(page => inRoot(page.path, f.path)) &&
           f.path.toLowerCase().includes(query.toLowerCase()),
       );
   }
@@ -49,9 +53,9 @@ class HtmlFileSuggestModal extends SuggestModal<TFile> {
     this.setPlaceholder("Choose an HTML file to open");
   }
 
-  getSuggestions(query: string): TFile[] {
+  async getSuggestions(query: string): Promise<TFile[]> {
     const normalizedQuery = query.trim().toLowerCase();
-    return this.plugin.getHtmlFiles().filter((file) => {
+    return (await this.plugin.getHtmlFiles()).filter((file) => {
       if (!normalizedQuery) {
         return true;
       }
@@ -92,9 +96,23 @@ class HtmlFileSuggestModal extends SuggestModal<TFile> {
 
 export default class HtmlViewerPlugin extends Plugin {
   settings: HtmlViewerSettings = DEFAULT_SETTINGS;
+  private htmlCatalog?: HtmlCatalog<TFile>;
+  private htmlFilters = "";
 
   async onload(): Promise<void> {
     await this.loadSettings();
+    this.htmlFilters = this.htmlFilterKey();
+    this.htmlCatalog = new HtmlCatalog(
+      () => this.app.vault.getFiles(),
+      file => this.app.vault.cachedRead(file),
+      path => this.isHtmlPathVisible(path),
+    );
+    this.registerEvent(this.app.vault.on("create", file => this.htmlCatalog?.invalidate(file instanceof TFile ? file.path : undefined)));
+    this.registerEvent(this.app.vault.on("modify", file => this.htmlCatalog?.invalidate(file.path)));
+    this.registerEvent(this.app.vault.on("delete", file => this.htmlCatalog?.invalidate(file instanceof TFile ? file.path : undefined)));
+    this.registerEvent(this.app.vault.on("rename", () => this.htmlCatalog?.invalidate()));
+    this.app.workspace.onLayoutReady(() => this.htmlCatalog?.invalidate());
+
 
     this.registerView(VIEW_TYPE_HTML, (leaf) => new HtmlViewerView(leaf, this));
     this.registerExtensions(["html", "htm"], VIEW_TYPE_HTML);
@@ -122,7 +140,7 @@ export default class HtmlViewerPlugin extends Plugin {
 
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu, file) => {
-        if (file instanceof TFile && isPage(file.path)) {
+        if (file instanceof TFile && isReadablePage(file.path)) {
           menu.addItem((item) => {
             item
               .setTitle("Open in HTML Viewer")
@@ -153,21 +171,30 @@ export default class HtmlViewerPlugin extends Plugin {
     new HtmlFileSuggestModal(this).open();
   }
 
-  getHtmlFiles(): TFile[] {
-    const excludePatterns = [
-      ...BUILT_IN_EXCLUDED_PATH_PATTERNS,
-      ...parseExcludePatterns(this.settings.excludedPathPatterns),
-    ];
-    const exactExcludedPaths = new Set(
-      this.settings.exactExcludedPaths.map((path) => path.toLowerCase()),
-    );
+  /** Version 1 metadata-only catalog used by this chooser, Library/Pages and VCC. */
+  getHtmlCatalog(): Promise<readonly HtmlCatalogEntry[]> {
+    return this.htmlCatalog?.get() ?? Promise.resolve([]);
+  }
 
-    return this.app.vault
-      .getFiles()
-      .filter((file) => isPage(file.path))
-      .filter((file) => !exactExcludedPaths.has(file.path.toLowerCase()))
-      .filter((file) => !isPathExcluded(file.path, excludePatterns))
-      .sort((a, b) => a.path.localeCompare(b.path));
+  subscribeHtmlCatalog(listener: () => void): () => void {
+    return this.htmlCatalog?.subscribe(listener) ?? (() => {});
+  }
+
+  onunload(): void {
+    this.htmlCatalog?.dispose();
+  }
+
+  async getHtmlFiles(): Promise<TFile[]> {
+    return (await this.getHtmlCatalog()).map(row => this.app.vault.getAbstractFileByPath(row.path)).filter((file): file is TFile => file instanceof TFile);
+  }
+
+  private htmlFilterKey(): string {
+    return JSON.stringify([this.settings.excludedPathPatterns, this.settings.exactExcludedPaths]);
+  }
+
+  private isHtmlPathVisible(path: string): boolean {
+    const excludePatterns = [...BUILT_IN_EXCLUDED_PATH_PATTERNS, ...parseExcludePatterns(this.settings.excludedPathPatterns)];
+    return !this.settings.exactExcludedPaths.some(hidden => hidden.toLowerCase() === path.toLowerCase()) && !isPathExcluded(path, excludePatterns);
   }
 
   async hideHtmlFileFromChooser(file: TFile): Promise<void> {
@@ -222,5 +249,10 @@ export default class HtmlViewerPlugin extends Plugin {
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
+    const filters = this.htmlFilterKey();
+    if (filters !== this.htmlFilters) {
+      this.htmlFilters = filters;
+      this.htmlCatalog?.invalidate();
+    }
   }
 }

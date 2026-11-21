@@ -20,7 +20,7 @@ import {
   Project,
   extension,
   inRoot,
-  isPage,
+  isReadablePage,
   makeBundle,
   pathOnly,
   pagePath,
@@ -74,6 +74,8 @@ export class HtmlViewerView extends ItemView {
   private toolbar?: HTMLElement;
   private optionsButton?: HTMLButtonElement;
   private search = "";
+  private catalogGeneration = 0;
+  private unsubscribeCatalog?: () => void;
   private openLibrary = false;
   private zoom = 1;
   private video: Modal | null = null;
@@ -214,7 +216,8 @@ export class HtmlViewerView extends ItemView {
       this.updateLibrary();
     });
     this.resize.observe(root);
-    this.renderLibrary();
+    this.unsubscribeCatalog = this.plugin.subscribeHtmlCatalog(() => void this.renderLibrary());
+    void this.renderLibrary();
     this.toggleLibrary(false);
     this.registerEvent(
       this.app.vault.on("rename", (file, old) => {
@@ -242,6 +245,8 @@ export class HtmlViewerView extends ItemView {
   }
   async onClose() {
     this.generation++;
+    this.catalogGeneration++;
+    this.unsubscribeCatalog?.();
     this.video?.close();
     this.resize?.disconnect();
     this.focusAction?.remove();
@@ -328,7 +333,7 @@ export class HtmlViewerView extends ItemView {
     return makeBundle(entries);
   }
   async loadFile(file: TFile) {
-    if (!isPage(file.path)) return;
+    if (!isReadablePage(file.path)) return;
     let p = this.plugin.settings.projects.find(
       (p) => p.entry === file.path || (p.root && inRoot(file.path, p.root)),
     );
@@ -348,13 +353,12 @@ export class HtmlViewerView extends ItemView {
     await this.loadProject(p, pageURL(file.path));
   }
   async addFolder(folder: TFolder) {
-    const files = this.app.vault
-      .getFiles()
-      .filter((f) => inRoot(f.path, folder.path) && isPage(f.path))
+    const files = (await this.plugin.getHtmlFiles())
+      .filter((f) => inRoot(f.path, folder.path))
       .sort((a, b) => a.path.localeCompare(b.path));
     const first = files.find((f) => /^index\.html?$/i.test(f.name)) ?? files[0];
     if (!first) {
-      new Notice("No HTML or text pages in this folder.");
+      new Notice("No visible HTML pages in this folder.");
       return;
     }
     let p = this.plugin.settings.projects.find((p) => p.root === folder.path);
@@ -370,7 +374,8 @@ export class HtmlViewerView extends ItemView {
       this.plugin.settings.projects.push(p);
       await this.plugin.saveSettings();
     }
-    await this.loadProject(p, p.last);
+    const last = files.some(f => f.path === pagePath(p.last)) ? p.last : pageURL(first.path);
+    await this.loadProject(p, last);
   }
   private async loadProject(
     project: Project,
@@ -424,7 +429,7 @@ export class HtmlViewerView extends ItemView {
     }
     if (
       !this.bundle.text.has(pagePath(relative)) ||
-      !isPage(pagePath(relative))
+      !isReadablePage(pagePath(relative))
     ) {
       this.showNotice("That page is not in this project.");
       return;
@@ -526,21 +531,26 @@ export class HtmlViewerView extends ItemView {
       (this.project.root ? pageURL(this.project.root) + "/" : "") + next,
     );
   }
-  private renderLibrary() {
+  private async renderLibrary() {
     if (!this.list) return;
+    const ticket = ++this.catalogGeneration;
+    const catalog = await this.plugin.getHtmlCatalog();
+    if (ticket !== this.catalogGeneration || !this.iframe) return;
+    const paths = new Set(catalog.map(row => row.path));
     this.list.empty();
     const q = this.search.toLowerCase();
     this.list.createEl("h3", { text: "Projects" });
     for (const p of this.plugin.settings.projects.filter(
       (p) =>
-        !q ||
-        p.name.toLowerCase().includes(q) ||
-        p.root.toLowerCase().includes(q),
+        catalog.some(row => p.root ? inRoot(row.path, p.root) : row.path === p.entry) &&
+        (!q || p.name.toLowerCase().includes(q) || p.root.toLowerCase().includes(q)),
     )) {
       const row = this.list.createDiv({ cls: "html-viewer-project" });
       const b = row.createEl("button", { text: p.name });
       b.setAttribute("aria-current", String(p.id === this.project?.id));
-      b.onclick = () => void this.loadProject(p);
+      const first = catalog.find(row => p.root ? inRoot(row.path, p.root) : row.path === p.entry)!;
+      const target = paths.has(pagePath(p.last)) ? p.last : pageURL(paths.has(p.entry) ? p.entry : first.path);
+      b.onclick = () => void this.loadProject(p, target);
       this.button(row, `Remove ${p.name} from library`, "x", () =>
         confirmAction(
           this.plugin,
@@ -559,7 +569,7 @@ export class HtmlViewerView extends ItemView {
     if (this.project && this.bundle) {
       this.list.createEl("h3", { text: "Pages" });
       for (const p of [...this.bundle.text.keys()]
-        .filter(isPage)
+        .filter(p => paths.has((this.project!.root ? this.project!.root + "/" : "") + p))
         .filter((p) => !q || p.toLowerCase().includes(q))
         .sort()) {
         const full = (this.project.root ? this.project.root + "/" : "") + p;

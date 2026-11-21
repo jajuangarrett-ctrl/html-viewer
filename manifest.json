@@ -1,9 +1,9 @@
 {
   "id": "html-viewer",
   "name": "HTML Viewer",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "minAppVersion": "1.4.0",
-  "description": "Read local HTML and text projects with compact mobile navigation, offline safe mode and explicit trusted interactivity.",
+  "description": "Read local HTML with filtered Library and Pages, compact mobile navigation, offline safe mode and explicit trusted interactivity.",
   "author": "Franklin Garrett",
   "authorUrl": "https://github.com/jajuangarrett-ctrl",
   "isDesktopOnly": false

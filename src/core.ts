@@ -51,7 +51,11 @@ export function extension(path: string) {
   return path.split(".").pop()?.toLowerCase() ?? "";
 }
 export function isPage(path: string) {
-  return ["html", "htm", "txt"].includes(extension(path));
+  return ["html", "htm"].includes(extension(path));
+}
+/** Direct legacy text opening remains available, but text is not an HTML page. */
+export function isReadablePage(path: string) {
+  return isPage(path) || extension(path) === "txt";
 }
 export function safePath(path: string): boolean {
   return (

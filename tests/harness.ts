@@ -1,5 +1,6 @@
 import { HtmlViewerView } from "../src/HtmlViewerView";
 import { TFile, TFolder } from "./obsidian";
+import { HtmlCatalog } from "../src/htmlCatalog";
 import { makeBundle, pageURL } from "../src/core";
 import { preparePage } from "../src/renderer";
 const prototype = HTMLElement.prototype as any;
@@ -89,7 +90,11 @@ let view: HtmlViewerView;
     trusted: opts.trusted ?? false,
   };
   settings.projects.push(p);
+  const catalog = new HtmlCatalog(() => files, async f => new TextDecoder().decode(f.bytes), path => !(opts.excluded ?? []).includes(path));
   const plugin: any = {
+    getHtmlCatalog: () => catalog.get(),
+    getHtmlFiles: async () => (await catalog.get()).map(row => files.find(f => f.path === row.path)),
+    subscribeHtmlCatalog: (fn: () => void) => catalog.subscribe(fn),
     app,
     settings,
     saveSettings: async () => {},
