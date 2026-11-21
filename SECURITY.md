@@ -11,3 +11,10 @@ Trusted mode intentionally runs a reviewed document's code in this opaque frame 
 External navigation requires the off-by-default setting plus a destination confirmation; the URL itself may contain data and must be reviewed. An explicit supported-video Load creates a separate provider iframe, not a network permission for the local HTML. The mock-video tests prove load timing/lifecycle, not provider availability or absence of YouTube tracking.
 
 Browser tests intercept network from before document preparation, verify no hostile probe requests in safe mode, and exercise opaque-parent isolation and project fetch boundaries. This is a bounded application test, not a formal audit or a guarantee about all future web-engine vulnerabilities.
+
+
+### Opt-in iOS catalog export
+
+The desktop producer writes only exact vault-relative path and filename-derived title metadata for filtered HTML pages to `Artifacts/HTML Viewer/ios-catalog.json`. This lives in the vault and may be propagated by the user's existing sync configuration; it is never sent to a network service by the plugin. The switch and previous exact-byte SHA-256 are stored per vault and desktop, not in synchronized plugin settings. The exporter does not modify source pages, overwrite an unrecognized file, or follow symbolic links in the output path. It retains the previous catalog on transient incomplete classification.
+
+On iOS the explicit companion-app handoff first verifies the selected HTML row, then sends only the percent-encoded relative path after a separate tap. It does not export from mobile, disclose file contents, or grant the receiving app any filesystem access.

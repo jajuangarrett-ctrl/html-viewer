@@ -1,14 +1,17 @@
-import { Notice, Plugin, SuggestModal, TFile, TFolder } from "obsidian";
+import { Notice, Platform, Plugin, SuggestModal, TFile, TFolder } from "obsidian";
 import {
   HtmlViewerSettingTab,
   DEFAULT_SETTINGS,
   HtmlViewerSettings,
 } from "./src/settings";
-import { HtmlViewerView, VIEW_TYPE_HTML } from "./src/HtmlViewerView";
-import { isReadablePage, safePath, pagePath, inRoot } from "./src/core";
+import { confirmAction, HtmlViewerView, VIEW_TYPE_HTML } from "./src/HtmlViewerView";
+import { isPage, isReadablePage, safePath, pagePath, inRoot } from "./src/core";
 import { isPathExcluded, parseExcludePatterns } from "./src/fileFilters";
 
 import { HtmlCatalog, HtmlCatalogEntry } from "./src/htmlCatalog";
+import { IOS_CATALOG_FILE, IOSCatalogExporter, isIOSCatalogPage, iosPageURL, type IOSCatalogExportResult } from "./src/iosCatalogExport";
+import { desktopCatalogOutput, iosPublishingEnabled, saveIOSPublishingEnabled } from "./src/iosDesktopCatalog";
+
 
 const BUILT_IN_EXCLUDED_PATH_PATTERNS = [
   "node_modules/",
@@ -98,8 +101,16 @@ export default class HtmlViewerPlugin extends Plugin {
   settings: HtmlViewerSettings = DEFAULT_SETTINGS;
   private htmlCatalog?: HtmlCatalog<TFile>;
   private htmlFilters = "";
+  private nativeExporter?: IOSCatalogExporter;
+  private layoutReady = false;
+  private unloading = false;
+  private lastAutomaticIssue = "";
+
 
   async onload(): Promise<void> {
+    this.unloading = false;
+    this.layoutReady = false;
+    this.lastAutomaticIssue = "";
     await this.loadSettings();
     this.htmlFilters = this.htmlFilterKey();
     this.htmlCatalog = new HtmlCatalog(
@@ -107,12 +118,33 @@ export default class HtmlViewerPlugin extends Plugin {
       file => this.app.vault.cachedRead(file),
       path => this.isHtmlPathVisible(path),
     );
-    this.registerEvent(this.app.vault.on("create", file => this.htmlCatalog?.invalidate(file instanceof TFile ? file.path : undefined)));
-    this.registerEvent(this.app.vault.on("modify", file => this.htmlCatalog?.invalidate(file.path)));
-    this.registerEvent(this.app.vault.on("delete", file => this.htmlCatalog?.invalidate(file instanceof TFile ? file.path : undefined)));
-    this.registerEvent(this.app.vault.on("rename", () => this.htmlCatalog?.invalidate()));
-    this.app.workspace.onLayoutReady(() => this.htmlCatalog?.invalidate());
-
+    if (this.canProduceIOSCatalog()) {
+      this.nativeExporter = new IOSCatalogExporter(() => this.htmlCatalog!.getForPublishing(), desktopCatalogOutput(this.app), (result) => {
+        if (this.unloading || !this.isPublishingIOSCatalog()) return;
+        const issue = result.status === "collision" || result.status === "error" || result.status === "too-large" ? result.message : "";
+        if (issue && this.lastAutomaticIssue !== issue) new Notice(issue);
+        this.lastAutomaticIssue = issue;
+      });
+    }
+    this.registerEvent(this.app.vault.on("create", file => {
+      if (file instanceof TFile && this.affectsHtmlCatalog(file.path)) this.invalidateHtmlCatalog(file.path);
+    }));
+    this.registerEvent(this.app.vault.on("modify", file => {
+      if (file instanceof TFile && this.affectsHtmlCatalog(file.path)) this.invalidateHtmlCatalog(file.path);
+    }));
+    this.registerEvent(this.app.vault.on("delete", file => {
+      if (file instanceof TFolder) this.invalidateHtmlCatalog();
+      else if (file instanceof TFile && this.affectsHtmlCatalog(file.path)) this.invalidateHtmlCatalog(file.path);
+    }));
+    this.registerEvent(this.app.vault.on("rename", (file, oldPath) => {
+      if (file instanceof TFolder || (file instanceof TFile && (this.affectsHtmlCatalog(file.path) || this.affectsHtmlCatalog(oldPath)))) this.invalidateHtmlCatalog();
+    }));
+    this.app.workspace.onLayoutReady(() => {
+      if (this.unloading) return;
+      this.layoutReady = true;
+      this.invalidateHtmlCatalog();
+      this.nativeExporter?.setEnabled(this.isPublishingIOSCatalog());
+    });
 
     this.registerView(VIEW_TYPE_HTML, (leaf) => new HtmlViewerView(leaf, this));
     this.registerExtensions(["html", "htm"], VIEW_TYPE_HTML);
@@ -151,7 +183,104 @@ export default class HtmlViewerPlugin extends Plugin {
       }),
     );
 
+    if (this.canProduceIOSCatalog()) {
+      this.addCommand({
+        id: "regenerate-ios-catalog",
+        name: "Regenerate iOS HTML Viewer catalog",
+        checkCallback: checking => {
+          if (!this.isPublishingIOSCatalog()) return false;
+          if (!checking) void this.regenerateIOSCatalogWithNotice();
+          return true;
+        },
+      });
+    }
+    if (Platform.isIosApp) {
+      this.addCommand({
+        id: "open-in-ios-html-viewer",
+        name: "Open in iOS HTML Viewer",
+        checkCallback: checking => {
+          const file = this.activeIOSPage();
+          if (!file) return false;
+          if (!checking) void this.confirmOpenInIOSViewer(file);
+          return true;
+        },
+      });
+    }
+
     this.addSettingTab(new HtmlViewerSettingTab(this.app, this));
+  }
+
+  private affectsHtmlCatalog(path: string): boolean {
+    // Export JSON, local preferences and temp files cannot feed a refresh loop.
+    return isPage(path) && safePath(path);
+  }
+
+  private invalidateHtmlCatalog(path?: string): void {
+    this.htmlCatalog?.invalidate(path);
+    this.nativeExporter?.requestRefresh();
+  }
+
+  canProduceIOSCatalog(): boolean {
+    return Platform.isDesktopApp === true;
+  }
+
+  isPublishingIOSCatalog(): boolean {
+    return this.canProduceIOSCatalog() && iosPublishingEnabled(this.app);
+  }
+
+  /** Explicit device-local opt-in; no synchronized plugin preference is changed. */
+  async enableIOSCatalogPublishing(): Promise<IOSCatalogExportResult> {
+    if (!this.nativeExporter) return { status: "disabled", message: "Only desktop Obsidian can publish the iOS catalog." };
+    try {
+      saveIOSPublishingEnabled(this.app, true);
+    } catch {
+      return { status: "error", message: "Could not save the device-local iOS catalog preference." };
+    }
+    if (!this.layoutReady) return { status: "superseded", message: "Publishing is enabled. The first export will run after this vault opens." };
+    this.nativeExporter.setEnabled(true);
+    return this.nativeExporter.regenerate();
+  }
+
+  disableIOSCatalogPublishing(): void {
+    if (!this.nativeExporter) return;
+    saveIOSPublishingEnabled(this.app, false);
+    this.nativeExporter.setEnabled(false);
+  }
+
+  regenerateIOSCatalog(): Promise<IOSCatalogExportResult> {
+    return this.nativeExporter?.regenerate() ?? Promise.resolve({ status: "disabled", message: "Only desktop Obsidian can publish the iOS catalog." });
+  }
+
+  showIOSCatalogResult(result: IOSCatalogExportResult): void {
+    if ("message" in result) new Notice(result.message);
+    else new Notice(`iOS HTML Viewer catalog ${result.status === "written" ? "saved" : "already up to date"}: ${result.entries} pages in ${IOS_CATALOG_FILE}`);
+  }
+
+  async regenerateIOSCatalogWithNotice(): Promise<void> {
+    this.showIOSCatalogResult(await this.regenerateIOSCatalog());
+  }
+
+  private activeIOSPage(): TFile | null {
+    const file = this.app.workspace.getActiveViewOfType(HtmlViewerView)?.currentFile
+      ?? this.app.workspace.getActiveFile();
+    return file instanceof TFile && isIOSCatalogPage(file.path) && this.isHtmlPathVisible(file.path) ? file : null;
+  }
+
+  private async confirmOpenInIOSViewer(file: TFile): Promise<void> {
+    const path = file.path;
+    const stamp = `${file.stat.mtime}:${file.stat.size}`;
+    const current = () => !this.unloading && this.activeIOSPage() === file &&
+      file.path === path && `${file.stat.mtime}:${file.stat.size}` === stamp;
+    const url = iosPageURL(path);
+    if (!url) return;
+    if (!(await this.getHtmlCatalog()).some(row => row.path === path) || !current()) {
+      if (!this.unloading) new Notice("The selected file is no longer an eligible HTML page.");
+      return;
+    }
+    confirmAction(this, "Open in iOS HTML Viewer", "The iOS app will receive only the vault-relative path of this page. The page must be in the published catalog on that device.", "Open app", () => {
+      if (current()) window.open(url, "_blank", "noopener,noreferrer");
+      else new Notice("The current HTML page changed. Run the command again.");
+    });
   }
 
   async openHtmlFile(file: TFile): Promise<void> {
@@ -181,6 +310,8 @@ export default class HtmlViewerPlugin extends Plugin {
   }
 
   onunload(): void {
+    this.unloading = true;
+    this.nativeExporter?.dispose();
     this.htmlCatalog?.dispose();
   }
 
@@ -252,7 +383,7 @@ export default class HtmlViewerPlugin extends Plugin {
     const filters = this.htmlFilterKey();
     if (filters !== this.htmlFilters) {
       this.htmlFilters = filters;
-      this.htmlCatalog?.invalidate();
+      this.invalidateHtmlCatalog();
     }
   }
 }

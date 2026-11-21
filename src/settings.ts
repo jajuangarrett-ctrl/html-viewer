@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type { Project } from "./core";
 import type HtmlViewerPlugin from "../main";
 
@@ -82,6 +82,27 @@ export class HtmlViewerSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           });
       });
+
+    if (this.plugin.canProduceIOSCatalog()) {
+      new Setting(containerEl)
+        .setName("Publish iOS HTML Viewer catalog on this desktop")
+        .setDesc("Off by default. Use one desktop. Writes only HTML file paths and titles into Artifacts/HTML Viewer/ios-catalog.json for your existing vault sync. Turning it off stops updates; the last file stays in the vault.")
+        .addToggle(toggle => toggle.setValue(this.plugin.isPublishingIOSCatalog()).onChange(async enabled => {
+          if (enabled) this.plugin.showIOSCatalogResult(await this.plugin.enableIOSCatalogPublishing());
+          else {
+            try {
+              this.plugin.disableIOSCatalogPublishing();
+              new Notice("iOS catalog updates stopped. The last exported file stays in the vault.");
+            } catch { new Notice("Could not save the device-local iOS catalog preference."); }
+          }
+          this.display();
+        }));
+      new Setting(containerEl)
+        .setName("Regenerate iOS catalog")
+        .setDesc("Use current HTML files and exclusions. An unrecognized file at the catalog path is never overwritten.")
+        .addButton(button => button.setButtonText("Regenerate").setDisabled(!this.plugin.isPublishingIOSCatalog())
+          .onClick(() => this.plugin.regenerateIOSCatalogWithNotice()));
+    }
 
     containerEl.createEl("h3", { text: "Hidden files" });
 

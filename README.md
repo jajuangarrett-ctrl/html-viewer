@@ -1,6 +1,6 @@
 # HTML Viewer for Obsidian
 
-**0.2.3** adds a shared, filtered HTML catalog. The 0.2 series brings the local HTML reading workflow from the companion iOS HTML Viewer into the existing `html-viewer` plugin, now on desktop **and mobile**. It does not replace or change the iOS app.
+**0.2.4** adds an opt-in catalog for the companion iOS HTML Viewer and an explicit iOS handoff. **0.2.3** added the shared, filtered HTML catalog. The 0.2 series brings the local HTML reading workflow from the companion iOS HTML Viewer into the existing `html-viewer` plugin, now on desktop **and mobile**. It does not replace or change the iOS app.
 
 ## Install or update with BRAT
 
@@ -15,7 +15,16 @@ A manual release contains `main.js`, `manifest.json`, and `styles.css`. Put thos
 3. Tap **Library and Pages** to switch projects or pages. **Add folder** selects an existing vault folder; it is a reference, not a second imported copy. Removing a library reference never deletes files.
 4. **Page Options** offers back/forward, start page, reload from vault, scale, safe/trusted mode, and detected videos.
 
-The source is read-only. No source HTML, attachments, dashboard data, or other vault files are rewritten. A file at the vault root is a single-file project; put it in its own folder to use neighboring assets. Hidden paths and unsupported file types are not bundled. Limits: 256 supported files, 32 MB total, 8 MB per file.
+The source is read-only. No source HTML, attachments or dashboard data are rewritten. The separate opt-in catalog feature writes only its own metadata file. A file at the vault root is a single-file project; put it in its own folder to use neighboring assets. Hidden paths and unsupported file types are not bundled. Limits: 256 supported files, 32 MB total, 8 MB per file.
+
+## Use the iOS HTML Viewer catalog
+
+1. On **one** desktop with the complete vault, go to **HTML Viewer settings → Publish iOS HTML Viewer catalog on this desktop**. The switch is off by default and stays local to that desktop and vault; installing on another device does not enable it.
+2. It saves a version-1 manifest at `Artifacts/HTML Viewer/ios-catalog.json` containing only vault-relative paths and filename-derived titles of genuine, visible HTML/HTM pages. Your current exclusions apply. There is no HTML content, API key, timestamp, absolute device path or resource URL in the file. No source file is changed. The scheduled update is debounced; **Regenerate iOS catalog** can retry manually after a file finishes downloading.
+3. In the companion iOS app, choose the same accessible vault folder. The plugin does not grant the iOS app folder access and cannot verify that your sync provider has delivered the catalog or the full HTML files. Catalog support requires an iOS app version that implements the version-1 reader.
+4. In **Obsidian on iOS**, while viewing a genuine catalog page, use **HTML Viewer: Open in iOS HTML Viewer**, then choose **Open app**. It passes only the selected vault-relative path. The iOS app must already have access to the page and find its exact entry in the synced catalog. Nothing opens automatically.
+
+Identical exports do not rewrite the file. Unrelated or externally modified data at the export path is never adopted for replacement. If the desktop cannot classify a file due to a temporary read error, or the catalog exceeds 2,000 pages / 1 MiB, the previous export stays in place. Turning off the switch freezes the last exported file without deleting it.
 
 ## iPhone Duo and responsive layouts
 

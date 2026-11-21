@@ -6,6 +6,7 @@ export type CatalogFile = { path: string; basename: string; stat: { size: number
 /** Metadata-only public catalog. Raw document contents never leave this service. */
 export class HtmlCatalog<F extends CatalogFile> {
   private revision = 0;
+  private failedRevision = -1;
   private disposed = false;
   private cache = new Map<string, { stamp: string; html: boolean }>();
   private pending?: { revision: number; value: Promise<readonly HtmlCatalogEntry[]> };
@@ -45,6 +46,12 @@ export class HtmlCatalog<F extends CatalogFile> {
     this.pending = { revision, value };
     return value;
   }
+  /** A partial local/provider read is usable for browsing but must not replace a synced manifest. */
+  async getForPublishing(): Promise<readonly HtmlCatalogEntry[]> {
+    const rows = await this.get();
+    if (this.disposed || this.failedRevision === this.revision) throw new Error("HTML catalog is temporarily incomplete");
+    return rows;
+  }
   private async build(revision: number): Promise<readonly HtmlCatalogEntry[]> {
     const files = this.files().filter(f => safePath(f.path) && isPage(f.path) && this.allowed(f.path) && f.stat.size <= MAX_FILE_BYTES);
     const paths = new Set(files.map(f => f.path));
@@ -68,6 +75,7 @@ export class HtmlCatalog<F extends CatalogFile> {
     }));
     if (this.disposed) return Object.freeze([]);
     if (revision !== this.revision) return this.get();
+    this.failedRevision = readFailed ? revision : -1;
     // A transient provider/read error must be retried by the next manual query.
     if (readFailed && this.pending?.revision === revision) this.pending = undefined;
     return Object.freeze(rows.sort((a, b) => a.path.localeCompare(b.path)));

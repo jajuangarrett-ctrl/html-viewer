@@ -1,3 +1,9 @@
+## 0.2.4 iOS catalog producer — November 21, 2026
+
+- The unit suite covers desktop opt-in, bounded/debounced refresh, incomplete scan retention, settings and lifecycle, deterministic UTF-8 including exact Unicode paths, no-op identical writes, atomic conflict handling, symlink refusal, and the explicit iOS command with stale-page prevention.
+- The Chromium and WebKit suites exercise existing reader, catalog consumers, chooser, rendering, navigation and layout. Desktop Electron capability checks confirmed the installed host has Web Crypto, filesystem guards and vault-local preferences; no live vault files were used in product tests.
+- OS-level launching from physical iOS Obsidian and delivery through a real vault sync provider remain separate acceptance steps. No app install or live catalog export is performed by the test fixtures.
+
 ## 0.2.3 catalog update — November 21, 2026
 
 - 37 unit tests passed, including shared content classification, immutable metadata-only results, exclusions, bounded reads, transient failure retry, stale-read invalidation, subscribers/unload, and the actual plugin event/settings wiring with no viewer open.
